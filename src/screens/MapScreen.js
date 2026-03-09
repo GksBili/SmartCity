@@ -9,9 +9,9 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { useFocusEffect } from "@react-navigation/native";
 import MapView, { Marker } from "react-native-maps";
 import * as Location from "expo-location";
+import { useFocusEffect } from "@react-navigation/native";
 import useLocation from "../hooks/useLocation";
 import {
   fetchNearbyGooglePlaces,
@@ -24,74 +24,87 @@ export default function MapScreen() {
   const [currentPlace, setCurrentPlace] = useState(null);
   const [nearbyPlaces, setNearbyPlaces] = useState([]);
   const [loadingPlaces, setLoadingPlaces] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [savingId, setSavingId] = useState(null);
   const [savedIds, setSavedIds] = useState(new Set());
 
+  async function loadExistingSavedPlaces() {
+    try {
+      const saved = await getSavedPlaces();
+      const ids = new Set(saved.map((place) => place.placeId));
+      setSavedIds(ids);
+    } catch (error) {
+      console.log("Load saved ids error:", error.message);
+    }
+  }
+
   useFocusEffect(
     useCallback(() => {
-      async function loadExistingSavedPlaces() {
-        try {
-          const saved = await getSavedPlaces();
-          const ids = new Set(saved.map((place) => place.placeId || place.id));
-          setSavedIds(ids);
-        } catch (error) {
-          console.log("Load saved ids error:", error.message);
-        }
-      }
-
       loadExistingSavedPlaces();
     }, []),
   );
 
-  useEffect(() => {
-    async function loadMapData() {
-      if (!location?.coords) return;
+  async function loadMapData(showRefreshState = false) {
+    if (!location?.coords) return;
 
-      try {
-        const { latitude, longitude } = location.coords;
-
-        const reverse = await Location.reverseGeocodeAsync({
-          latitude,
-          longitude,
-        });
-
-        const first = reverse[0];
-
-        const currentLocationName = first
-          ? `${first.name || first.street || "Current Location"}${first.city ? `, ${first.city}` : ""}`
-          : "Current Location";
-
-        const currentAddress = first
-          ? `${first.street || ""} ${first.city || ""} ${first.region || ""}`.trim()
-          : "Your current location";
-
-        setCurrentPlace({
-          id: "current-location",
-          placeId: "current-location",
-          name: currentLocationName,
-          address: currentAddress,
-          category: "current location",
-          lat: latitude,
-          lng: longitude,
-          photoUrl: null,
-        });
-
-        const places = await fetchNearbyGooglePlaces(latitude, longitude);
-
-        const withPhotos = places.map((place) => ({
-          ...place,
-          photoUrl: buildPlacePhotoUrl(place.photoName),
-        }));
-
-        setNearbyPlaces(withPhotos);
-      } catch (error) {
-        console.log("Map data load error:", error.message);
-      } finally {
-        setLoadingPlaces(false);
+    try {
+      if (showRefreshState) {
+        setRefreshing(true);
+      } else {
+        setLoadingPlaces(true);
       }
-    }
 
-    loadMapData();
+      const { latitude, longitude } = location.coords;
+
+      const reverse = await Location.reverseGeocodeAsync({
+        latitude,
+        longitude,
+      });
+
+      const first = reverse[0];
+
+      const currentLocationName = first
+        ? `${first.name || first.street || "Current Location"}${
+            first.city ? `, ${first.city}` : ""
+          }`
+        : "Current Location";
+
+      const currentAddress = first
+        ? `${first.street || ""} ${first.city || ""} ${first.region || ""}`.trim()
+        : "Your current location";
+
+      setCurrentPlace({
+        id: "current-location",
+        placeId: "current-location",
+        name: currentLocationName,
+        address: currentAddress,
+        category: "current location",
+        lat: latitude,
+        lng: longitude,
+        photoUrl: null,
+      });
+
+      const places = await fetchNearbyGooglePlaces(latitude, longitude);
+
+      const withPhotos = places.map((place) => ({
+        ...place,
+        photoUrl: buildPlacePhotoUrl(place.photoName),
+      }));
+
+      setNearbyPlaces(withPhotos);
+    } catch (error) {
+      console.log("Map data load error:", error.message);
+      Alert.alert("Refresh failed", error.message);
+    } finally {
+      setLoadingPlaces(false);
+      setRefreshing(false);
+    }
+  }
+
+  useEffect(() => {
+    if (location?.coords) {
+      loadMapData();
+    }
   }, [location]);
 
   const allMarkers = useMemo(() => {
@@ -120,7 +133,7 @@ export default function MapScreen() {
         return updated;
       });
 
-      Alert.alert("Saved", `${place.name} was saved!`);
+      Alert.alert("Saved", `${place.name} was saved to Firestore.`);
     } catch (error) {
       Alert.alert("Save failed", error.message);
     } finally {
@@ -188,7 +201,19 @@ export default function MapScreen() {
       </MapView>
 
       <View style={styles.sheet}>
-        <Text style={styles.sheetTitle}>Places Around You</Text>
+        <View style={styles.headerRow}>
+          <Text style={styles.sheetTitle}>Places Around You</Text>
+
+          <TouchableOpacity
+            style={styles.refreshButton}
+            onPress={() => loadMapData(true)}
+            disabled={refreshing}
+          >
+            <Text style={styles.refreshButtonText}>
+              {refreshing ? "Refreshing..." : "Refresh"}
+            </Text>
+          </TouchableOpacity>
+        </View>
 
         {loadingPlaces ? (
           <ActivityIndicator style={{ marginTop: 12 }} />
@@ -209,7 +234,9 @@ export default function MapScreen() {
 
                 <View style={styles.textWrap}>
                   <Text style={styles.placeName}>{item.name}</Text>
-                  <Text style={styles.placeCategory}>{item.category}</Text>
+                  <Text style={styles.placeCategory}>
+                    {(item.category || "place").replace(/_/g, " ")}
+                  </Text>
                   <Text style={styles.placeAddress}>{item.address}</Text>
                   {renderSaveButton(item)}
                 </View>
@@ -235,10 +262,25 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
   },
+  headerRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 12,
+  },
   sheetTitle: {
     fontSize: 20,
     fontWeight: "700",
-    marginBottom: 12,
+  },
+  refreshButton: {
+    backgroundColor: "#222",
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  refreshButtonText: {
+    color: "white",
+    fontWeight: "600",
   },
   card: {
     backgroundColor: "#f4f4f4",
