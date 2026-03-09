@@ -130,6 +130,6 @@ const styles = StyleSheet.create({
   },
   deleteText: {
     color: "white",
-    fontWeight: "601",
+    fontWeight: "600",
   },
 });
