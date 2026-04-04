@@ -14,7 +14,7 @@ import {
 } from "react-native";
 import MapView, { Marker } from "react-native-maps";
 import * as Location from "expo-location";
-import { useFocusEffect } from "@react-navigation/native";
+import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import useLocation from "../hooks/useLocation";
 import {
   fetchNearbyGooglePlaces,
@@ -22,8 +22,21 @@ import {
 } from "../services/googlePlacesService";
 import { savePlace, getSavedPlaces } from "../services/savedPlacesService";
 
+function formatCategory(category) {
+  if (!category) return "Place";
+  return category
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function formatRating(rating) {
+  if (typeof rating !== "number") return "N/A";
+  return `${rating.toFixed(1)}/5 ⭐️`;
+}
+
 export default function MapScreen() {
   const { location, errorMsg } = useLocation();
+  const navigation = useNavigation();
   const mapRef = useRef(null);
 
   const [currentPlace, setCurrentPlace] = useState(null);
@@ -48,6 +61,12 @@ export default function MapScreen() {
     }
   }
 
+  useFocusEffect(
+    useCallback(() => {
+      loadExistingSavedPlaces();
+    }, []),
+  );
+
   async function handleDirections(place) {
     try {
       const appUrl = `comgooglemaps://?daddr=${place.lat},${place.lng}&directionsmode=driving`;
@@ -64,12 +83,6 @@ export default function MapScreen() {
       Alert.alert("Directions failed", error.message);
     }
   }
-
-  useFocusEffect(
-    useCallback(() => {
-      loadExistingSavedPlaces();
-    }, []),
-  );
 
   async function loadMapData(showRefreshState = false, customCenter = null) {
     const targetCenter =
@@ -99,9 +112,7 @@ export default function MapScreen() {
       });
 
       const first = reverse[0];
-
       const centerName = first?.city || first?.region || "Selected Area";
-
       const centerAddress = first
         ? `${first.street || ""} ${first.city || ""} ${first.region || ""}`.trim()
         : "Map center location";
@@ -115,6 +126,7 @@ export default function MapScreen() {
         lat: latitude,
         lng: longitude,
         photoUrl: null,
+        rating: null,
       });
 
       const places = await fetchNearbyGooglePlaces(latitude, longitude);
@@ -134,6 +146,44 @@ export default function MapScreen() {
       setMapMoved(false);
     }
   }
+
+  async function resetToUserLocation() {
+    if (!location?.coords) return;
+
+    const userCenter = {
+      latitude: location.coords.latitude,
+      longitude: location.coords.longitude,
+    };
+
+    setSearchQuery("");
+    setSearching(false);
+    setMapMoved(false);
+    setCurrentPlace(null);
+    setNearbyPlaces([]);
+    setMapCenter(userCenter);
+
+    mapRef.current?.animateToRegion(
+      {
+        latitude: userCenter.latitude,
+        longitude: userCenter.longitude,
+        latitudeDelta: 0.02,
+        longitudeDelta: 0.02,
+      },
+      800,
+    );
+
+    await loadMapData(false, userCenter);
+  }
+
+  useEffect(() => {
+    const unsubscribe = navigation.addListener("tabPress", (e) => {
+      if (navigation.isFocused()) {
+        resetToUserLocation();
+      }
+    });
+
+    return unsubscribe;
+  }, [navigation, location]);
 
   async function handleSearch() {
     const trimmed = searchQuery.trim();
@@ -163,17 +213,14 @@ export default function MapScreen() {
         longitudeDelta: 0.05,
       };
 
-      setMapCenter({
+      const newCenter = {
         latitude: first.latitude,
         longitude: first.longitude,
-      });
+      };
 
+      setMapCenter(newCenter);
       mapRef.current?.animateToRegion(region, 800);
-
-      await loadMapData(false, {
-        latitude: first.latitude,
-        longitude: first.longitude,
-      });
+      await loadMapData(false, newCenter);
     } catch (error) {
       Alert.alert("Search failed", error.message);
     } finally {
@@ -194,9 +241,7 @@ export default function MapScreen() {
   }, [location]);
 
   const allMarkers = useMemo(() => {
-    const markers = [];
-    if (currentPlace) markers.push(currentPlace);
-    return [...markers, ...nearbyPlaces];
+    return [currentPlace, ...nearbyPlaces].filter(Boolean);
   }, [currentPlace, nearbyPlaces]);
 
   async function handleSave(place) {
@@ -245,6 +290,44 @@ export default function MapScreen() {
     );
   }
 
+  function renderPlaceCard(item) {
+    return (
+      <View style={styles.card}>
+        {item.photoUrl ? (
+          <Image source={{ uri: item.photoUrl }} style={styles.photo} />
+        ) : (
+          <View style={[styles.photo, styles.photoPlaceholder]}>
+            <Text style={styles.placeholderText}>No Photo</Text>
+          </View>
+        )}
+
+        <View style={styles.textWrap}>
+          <Text style={styles.placeName}>{item.name}</Text>
+
+          <View style={styles.metaRow}>
+            <Text style={styles.placeCategory}>
+              {formatCategory(item.category)}
+            </Text>
+            <Text style={styles.ratingText}>{formatRating(item.rating)}</Text>
+          </View>
+
+          <Text style={styles.placeAddress}>{item.address}</Text>
+
+          <View style={styles.buttonRow}>
+            <TouchableOpacity
+              style={styles.directionsButton}
+              onPress={() => handleDirections(item)}
+            >
+              <Text style={styles.buttonText}>Directions</Text>
+            </TouchableOpacity>
+
+            {renderSaveButton(item)}
+          </View>
+        </View>
+      </View>
+    );
+  }
+
   if (errorMsg) {
     return (
       <View style={styles.center}>
@@ -257,7 +340,7 @@ export default function MapScreen() {
     return (
       <View style={styles.center}>
         <ActivityIndicator size="large" />
-        <Text style={{ marginTop: 10 }}>Loading map...</Text>
+        <Text style={styles.loadingText}>Loading map...</Text>
       </View>
     );
   }
@@ -319,7 +402,7 @@ export default function MapScreen() {
             key={place.id}
             coordinate={{ latitude: place.lat, longitude: place.lng }}
             title={place.name}
-            description={place.category}
+            description={formatCategory(place.category)}
           />
         ))}
       </MapView>
@@ -353,42 +436,13 @@ export default function MapScreen() {
         </View>
 
         {loadingPlaces ? (
-          <ActivityIndicator style={{ marginTop: 12 }} />
+          <ActivityIndicator style={styles.loadingList} />
         ) : (
           <FlatList
             data={[currentPlace, ...nearbyPlaces].filter(Boolean)}
             keyExtractor={(item) => item.id}
             showsVerticalScrollIndicator={false}
-            renderItem={({ item }) => (
-              <View style={styles.card}>
-                {item.photoUrl ? (
-                  <Image source={{ uri: item.photoUrl }} style={styles.photo} />
-                ) : (
-                  <View style={[styles.photo, styles.photoPlaceholder]}>
-                    <Text style={styles.placeholderText}>No Photo</Text>
-                  </View>
-                )}
-
-                <View style={styles.textWrap}>
-                  <Text style={styles.placeName}>{item.name}</Text>
-                  <Text style={styles.placeCategory}>
-                    {(item.category || "place").replace(/_/g, " ")}
-                  </Text>
-                  <Text style={styles.placeAddress}>{item.address}</Text>
-
-                  <View style={styles.buttonRow}>
-                    <TouchableOpacity
-                      style={styles.directionsButton}
-                      onPress={() => handleDirections(item)}
-                    >
-                      <Text style={styles.buttonText}>Directions</Text>
-                    </TouchableOpacity>
-
-                    {renderSaveButton(item)}
-                  </View>
-                </View>
-              </View>
-            )}
+            renderItem={({ item }) => renderPlaceCard(item)}
             ListEmptyComponent={<Text>No nearby places found.</Text>}
           />
         )}
@@ -398,8 +452,13 @@ export default function MapScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#fff" },
-  map: { flex: 1 },
+  container: {
+    flex: 1,
+    backgroundColor: "#fff",
+  },
+  map: {
+    flex: 1,
+  },
 
   searchOverlay: {
     position: "absolute",
@@ -412,7 +471,7 @@ const styles = StyleSheet.create({
   },
   searchInput: {
     flex: 1,
-    backgroundColor: "white",
+    backgroundColor: "#fff",
     borderRadius: 14,
     paddingHorizontal: 14,
     paddingVertical: 12,
@@ -432,7 +491,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   searchButtonText: {
-    color: "white",
+    color: "#fff",
     fontWeight: "700",
   },
 
@@ -450,11 +509,11 @@ const styles = StyleSheet.create({
     borderRadius: 9,
     backgroundColor: "#d9534f",
     borderWidth: 3,
-    borderColor: "white",
+    borderColor: "#fff",
   },
 
   sheet: {
-    maxHeight: 360,
+    maxHeight: 380,
     backgroundColor: "#fff",
     paddingHorizontal: 16,
     paddingTop: 16,
@@ -466,7 +525,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 8,
+    marginBottom: 10,
   },
   sheetTitle: {
     fontSize: 20,
@@ -484,7 +543,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#4CAF50",
   },
   refreshButtonText: {
-    color: "white",
+    color: "#fff",
     fontWeight: "600",
   },
 
@@ -510,19 +569,33 @@ const styles = StyleSheet.create({
     color: "#666",
     fontSize: 12,
   },
+
   textWrap: {
     flex: 1,
   },
   placeName: {
     fontSize: 16,
     fontWeight: "700",
-    marginBottom: 2,
+    marginBottom: 4,
+    color: "#111",
+  },
+  metaRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 6,
+    gap: 8,
   },
   placeCategory: {
+    flex: 1,
     fontSize: 13,
     color: "#555",
-    marginBottom: 4,
     textTransform: "capitalize",
+  },
+  ratingText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#667",
   },
   placeAddress: {
     fontSize: 13,
@@ -543,7 +616,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   buttonText: {
-    color: "white",
+    color: "#fff",
     fontWeight: "600",
   },
   saveButton: {
@@ -557,10 +630,16 @@ const styles = StyleSheet.create({
     backgroundColor: "#4CAF50",
   },
   saveButtonText: {
-    color: "white",
+    color: "#fff",
     fontWeight: "600",
   },
 
+  loadingList: {
+    marginTop: 12,
+  },
+  loadingText: {
+    marginTop: 10,
+  },
   center: {
     flex: 1,
     justifyContent: "center",
