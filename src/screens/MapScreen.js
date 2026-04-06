@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
+import { Ionicons } from "@expo/vector-icons";
 import {
   ActivityIndicator,
   Alert,
@@ -31,7 +32,7 @@ function formatCategory(category) {
 
 function formatRating(rating) {
   if (typeof rating !== "number") return "N/A";
-  return `${rating.toFixed(1)}/5 ⭐️`;
+  return rating.toFixed(1);
 }
 
 export default function MapScreen() {
@@ -308,7 +309,15 @@ export default function MapScreen() {
             <Text style={styles.placeCategory}>
               {formatCategory(item.category)}
             </Text>
-            <Text style={styles.ratingText}>{formatRating(item.rating)}</Text>
+              <View style={styles.ratingRow}>
+                <Text style={styles.ratingText}>
+                  {formatRating(item.rating)}
+                </Text>
+
+                {typeof item.rating === "number" && (
+                  <Ionicons name="star" size={14} color="#f5c518" />
+                )}
+            </View>
           </View>
 
           <Text style={styles.placeAddress}>{item.address}</Text>
@@ -644,5 +653,10 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
+  },
+  ratingRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
   },
 });
