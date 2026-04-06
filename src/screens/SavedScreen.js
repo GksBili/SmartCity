@@ -10,12 +10,15 @@ import {
   Linking,
 } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
+import { LinearGradient } from "expo-linear-gradient";
+import { useTheme } from "../components/ThemeContext";
 import {
   getSavedPlaces,
   removeSavedPlace,
 } from "../services/savedPlacesService";
 
 export default function SavedScreen() {
+  const { theme } = useTheme();
   const [places, setPlaces] = useState([]);
 
   async function loadPlaces() {
@@ -30,7 +33,7 @@ export default function SavedScreen() {
   useFocusEffect(
     useCallback(() => {
       loadPlaces();
-    }, []),
+    }, [])
   );
 
   async function handleDelete(id) {
@@ -46,24 +49,16 @@ export default function SavedScreen() {
     try {
       const appUrl = `comgooglemaps://?daddr=${place.lat},${place.lng}&directionsmode=driving`;
       const webUrl = `https://www.google.com/maps/dir/?api=1&destination=${place.lat},${place.lng}`;
-
       const canOpenApp = await Linking.canOpenURL(appUrl);
-
-      if (canOpenApp) {
-        await Linking.openURL(appUrl);
-      } else {
-        await Linking.openURL(webUrl);
-      }
+      if (canOpenApp) await Linking.openURL(appUrl);
+      else await Linking.openURL(webUrl);
     } catch (error) {
       Alert.alert("Directions failed", error.message);
     }
   }
 
   function renderPhoto(photoUrl) {
-    if (photoUrl) {
-      return <Image source={{ uri: photoUrl }} style={styles.photo} />;
-    }
-
+    if (photoUrl) return <Image source={{ uri: photoUrl }} style={styles.photo} />;
     return (
       <View style={[styles.photo, styles.photoPlaceholder]}>
         <Text style={styles.placeholderText}>No Photo</Text>
@@ -73,77 +68,61 @@ export default function SavedScreen() {
 
   function getGroupLabel(place) {
     const address = (place.address || "").trim();
-
-    if (!address) {
-      return "Places around Other Locations";
-    }
+    if (!address) return "Places around Other Locations";
 
     const parts = address
       .split(",")
       .map((part) => part.trim())
       .filter(Boolean);
-
-    if (parts.length === 0) {
-      return "Places around Other Locations";
-    }
+    if (parts.length === 0) return "Places around Other Locations";
 
     const country = parts[parts.length - 1];
-
-    // Try to find city
-    // Common Google formatted addresses look like:
-    // "10355 152 St, Surrey, BC V3R 7C1, Canada"
-    // So city is often second item if address is detailed enough.
     let city = "";
+    if (parts.length >= 2) city = parts[1];
+    if (!city && parts.length >= 3) city = parts[parts.length - 3];
+    if (!city && parts.length >= 2) city = parts[0];
 
-    if (parts.length >= 2) {
-      city = parts[1];
-    }
-
-    // Fallbacks if structure is unusual
-    if (!city && parts.length >= 3) {
-      city = parts[parts.length - 3];
-    }
-
-    if (!city && parts.length >= 2) {
-      city = parts[0];
-    }
-
-    const normalizedCountry = country.toLowerCase();
-
-    if (normalizedCountry === "canada") {
-      return `Places around ${city || "Canada"}`;
-    }
-
-    return `Places around ${city || country}, ${country}`;
+    return country.toLowerCase() === "canada"
+      ? `Places around ${city || "Canada"}`
+      : `Places around ${city || country}, ${country}`;
   }
 
   const groupedSections = useMemo(() => {
     const grouped = {};
-
     for (const place of places) {
       const label = getGroupLabel(place);
-
-      if (!grouped[label]) {
-        grouped[label] = [];
-      }
-
+      if (!grouped[label]) grouped[label] = [];
       grouped[label].push(place);
     }
-
     return Object.keys(grouped)
       .sort()
-      .map((title) => ({
-        title,
-        data: grouped[title],
-      }));
+      .map((title) => ({ title, data: grouped[title] }));
   }, [places]);
 
+  // ------------------ Theme based styling ------------------
+  const cardStyle =
+    theme === "weather"
+      ? [styles.card, { backgroundColor: "#0f63b1" }]
+      : styles.card;
+
+  const textColor = theme === "weather" ? "#fff" : "#222";
+  const titleColor = theme === "weather" ? "#222" : "#222"; 
+  const sectionTitleColor = theme === "weather" ? "#222" : "#222"; 
+  const categoryColor = theme === "weather" ? "#ccc" : "#555";
+  const addressColor = theme === "weather" ? "#ccc" : "#666";
+
+  const Container = theme === "weather" ? LinearGradient : View;
+  const containerProps =
+    theme === "weather"
+      ? { colors: ["#b1e6f7", "#019cf0"], style: styles.container }
+      : { style: styles.container };
+
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Saved Places</Text>
+    <Container {...containerProps}>
+      <Text style={[styles.title, { color: titleColor }]}>Saved Places</Text>
 
       {groupedSections.length === 0 ? (
-        <Text>No saved places yet.</Text>
+        <Text style={{ color: textColor }}>No saved places yet.</Text>
       ) : (
         <SectionList
           sections={groupedSections}
@@ -151,18 +130,19 @@ export default function SavedScreen() {
           showsVerticalScrollIndicator={false}
           stickySectionHeadersEnabled={false}
           renderSectionHeader={({ section: { title } }) => (
-            <Text style={styles.sectionTitle}>{title}</Text>
+            <Text style={[styles.sectionTitle, { color: sectionTitleColor }]}>
+              {title}
+            </Text>
           )}
           renderItem={({ item }) => (
-            <View style={styles.card}>
+            <View style={cardStyle}>
               {renderPhoto(item.photoUrl)}
-
               <View style={styles.textWrap}>
-                <Text style={styles.placeName}>{item.name}</Text>
-                <Text style={styles.placeCategory}>
+                <Text style={[styles.placeName, { color: textColor }]}>{item.name}</Text>
+                <Text style={[styles.placeCategory, { color: categoryColor }]}>
                   {(item.category || "place").replace(/_/g, " ")}
                 </Text>
-                <Text style={styles.placeAddress}>{item.address}</Text>
+                <Text style={[styles.placeAddress, { color: addressColor }]}>{item.address}</Text>
 
                 <View style={styles.buttonRow}>
                   <TouchableOpacity
@@ -184,14 +164,13 @@ export default function SavedScreen() {
           )}
         />
       )}
-    </View>
+    </Container>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f7f7f7",
     paddingHorizontal: 16,
     paddingTop: 40,
   },
@@ -205,7 +184,6 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     marginBottom: 10,
     marginTop: 10,
-    color: "#222",
   },
   card: {
     backgroundColor: "#ededed",
@@ -239,13 +217,11 @@ const styles = StyleSheet.create({
   },
   placeCategory: {
     fontSize: 13,
-    color: "#555",
     marginBottom: 4,
     textTransform: "capitalize",
   },
   placeAddress: {
     fontSize: 13,
-    color: "#666",
     marginBottom: 10,
   },
   buttonRow: {
