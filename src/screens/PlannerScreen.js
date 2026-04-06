@@ -337,7 +337,7 @@ export default function PlannerScreen() {
           <TextInput
             style={[styles.journalInput, themeStyles.inputText]}
             placeholder="How was your day?"
-            placeholderTextColor={isWeatherMode ? "#ccc" : "#777"}
+            placeholderTextColor={isWeatherMode ? "#fff" : "#777"}
             multiline
             value={journalText}
             onChangeText={setJournalText}

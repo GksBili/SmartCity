@@ -337,7 +337,7 @@ const styles = StyleSheet.create({
   },
   metaRow: { 
     marginTop: 16, 
-    gap: 6, 
+    gap: 2, 
   }, 
   metaText: { 
     fontSize: 13, 
