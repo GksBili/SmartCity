@@ -102,12 +102,12 @@ export default function SavedScreen() {
   // ------------------ Theme based styling ------------------
   const cardStyle =
     theme === "weather"
-      ? [styles.card, { backgroundColor: "#003566" }]
+      ? [styles.card, { backgroundColor: "#0f63b1" }]
       : styles.card;
 
   const textColor = theme === "weather" ? "#fff" : "#222";
-  const titleColor = theme === "weather" ? "#222" : "#222"; // 深色
-  const sectionTitleColor = theme === "weather" ? "#222" : "#222"; // 深色
+  const titleColor = theme === "weather" ? "#222" : "#222"; 
+  const sectionTitleColor = theme === "weather" ? "#222" : "#222"; 
   const categoryColor = theme === "weather" ? "#ccc" : "#555";
   const addressColor = theme === "weather" ? "#ccc" : "#666";
 

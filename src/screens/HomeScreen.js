@@ -40,14 +40,16 @@ export default function HomeScreen() {
           subtitle: { color: "grey" },
           bodyText: { color: "#333" },
           label: { color: "#222" },
+          metaText: { color: "#666" },
         }
       : {
           container: {}, 
-          card: { backgroundColor: "#005f73" },
+          card: { backgroundColor: "#00aacd" },
           title: { color: "#003566" },
           subtitle: { color: "#001845" },
           bodyText: { color: "#fff" },
           label: { color: "#003566" },
+          metaText: { color: "#fff" },
         };
 
   function getWeatherIcon(condition) {
@@ -193,10 +195,11 @@ export default function HomeScreen() {
                 <Text style={[styles.bodyText, themeStyles.bodyText]}>{recommendation.mood}</Text>
 
                 <View style={styles.metaRow}>
-                  <Text style={styles.metaText}>Time: {recommendation.timeOfDay}</Text>
-                  <Text style={styles.metaText}>Weather: {recommendation.weatherType}</Text>
-                  <Text style={styles.metaText}>Temp: {recommendation.tempBand}</Text>
+                <Text style={[styles.metaText, themeStyles.metaText]}> Time: {recommendation.timeOfDay} </Text>
+                <Text style={[styles.metaText, themeStyles.metaText]}> Weather: {recommendation.weatherType} </Text>
+                <Text style={[styles.metaText, themeStyles.metaText]}> Temp: {recommendation.tempBand} </Text>
                 </View>
+
               </View>
             )}
           </>
@@ -207,25 +210,45 @@ export default function HomeScreen() {
     );
   }
 
-  // ------------- Render Container ----------------
-  return theme === "weather" ? (
+
+ if (theme === "weather") {
+  return (
     <LinearGradient
       colors={['#b1e6f7', "#019cf0"]}
-      style={styles.container}
+      style={styles.root} 
     >
-      <ScrollView contentContainerStyle={{ flexGrow: 1, paddingBottom: 20 }}>
+      <ScrollView 
+        style={styles.root}
+        contentContainerStyle={styles.contentContainer} 
+      >
         {renderHomeContent()}
       </ScrollView>
     </LinearGradient>
-  ) : (
-    <ScrollView contentContainerStyle={[styles.container, themeStyles.container]}>
-      {renderHomeContent()}
-    </ScrollView>
   );
 }
 
-// ------------- Styles ----------------
+return (
+  <View style={[styles.root, themeStyles.container]}>
+    <ScrollView 
+      style={styles.root}
+      contentContainerStyle={styles.contentContainer} 
+    >
+      {renderHomeContent()}
+    </ScrollView>
+  </View>
+);
+}
+
 const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+  },
+  contentContainer: {
+    paddingHorizontal: 20,
+    paddingTop: 40, 
+    paddingBottom: 40,
+    flexGrow: 1,
+  },
   container:{
     padding: 20,
     flex:1,
