@@ -22,12 +22,7 @@ import { useTheme } from "../components/ThemeContext";
 import WeekCalendar from "../components/WeekCalendar";
 import PlannerEventCard from "../components/PlannerEventCard";
 import AddEventModal from "../components/AddEventModal";
-
 import { Ionicons } from "@expo/vector-icons";
-
-import { LinearGradient } from "expo-linear-gradient";
-import { useTheme } from "../components/ThemeContext";
-
 import {
   addWeeks,
   formatDateKey,
@@ -75,8 +70,6 @@ export default function PlannerScreen() {
   const selectedDateKey = formatDateKey(selectedDate);
   const hasLoadedInitially = useRef(false);
   const manualDateJumpRef = useRef(false);
-  
-  
 
  
   const isWeatherMode = theme === "weather";

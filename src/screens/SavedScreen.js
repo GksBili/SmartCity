@@ -102,14 +102,14 @@ export default function SavedScreen() {
   // ------------------ Theme based styling ------------------
   const cardStyle =
     theme === "weather"
-      ? [styles.card, { backgroundColor: "#0f63b1" }]
+      ? [styles.card, { backgroundColor: "#00aacd" }]
       : styles.card;
 
-  const textColor = theme === "weather" ? "#fff" : "#222";
+  const textColor = theme === "weather" ? "#222" : "#222";
   const titleColor = theme === "weather" ? "#222" : "#222"; 
   const sectionTitleColor = theme === "weather" ? "#222" : "#222"; 
-  const categoryColor = theme === "weather" ? "#ccc" : "#555";
-  const addressColor = theme === "weather" ? "#ccc" : "#666";
+  const categoryColor = theme === "weather" ? "#222" : "#555";
+  const addressColor = theme === "weather" ? "#222" : "#666";
 
   const Container = theme === "weather" ? LinearGradient : View;
   const containerProps =
